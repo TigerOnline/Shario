@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Shario</title>
+    <link rel="icon" type="image/x-icon" href="shario.ico">
+</head>
+
+<body>
+<h1 style="text-align: center;">Welcome to Shario!</h1>
+<p id="note"> Note: Please click the game to start playing</p>
+<style>
+    body{
+        margin:0;
+        overflow: hidden;
+    }
+    canvas{
+        border: 1px solid #000000;
+        padding-left: 0;
+        padding-right: 0;
+        margin-left: auto;
+        margin-right: auto;
+        margin-top: auto;
+        display: block;
+    }
+    h1 {
+        padding: 40px;
+        text-align: center;
+        background: #1abc9c;
+        color: white;
+        font-size: 45px;
+        font-family: "Arial";
+    }
+    #controls {
+        padding: 10px;
+        border-radius: 15px;
+        border: 2px solid #038260;
+    }
+    kbd {
+        background-color: #eee;
+        border-radius: 3px;
+        border: 1px solid #b4b4b4;
+        box-shadow: 0 1px 1px rgba(0, 0, 0, .2), 0 2px 0 0 rgba(255, 255, 255, .7) inset;
+        color: #333;
+        display: inline-block;
+        font-size: 1.6rem;
+        font-weight: 700;
+        line-height: 1;
+        padding: 2px 4px;
+        white-space: nowrap;
+        font-family: "Arial";
+    }
+
+    #note {
+        font-family: "Arial";
+        font-size: 1.3rem;
+        text-indent: 1em;
+    }
+    #controlText {
+        font-family: "Arial";
+        font-size: 1.6rem;
+
+    }
+    p::after{
+        content: "\00a0 ";
+    }
+
+</style>
+
+<script type="module">
+    import kaboom from "https://unpkg.com/kaboom@2000.1.8/dist/kaboom.mjs"
+    let playerScale = 0.2
+    let playerSpeed = 140
+    let jumpForce = 500
+    let leftDown = false
+    let rightDown = false
+    let lastLeft = 0
+    let lastRight = 1
+    let playOnceR = true
+    let playOnceL = true
+    let spacePressed = false
+    let mobSpeed = 30
+    let playerPos
+    let mobDetectRange = 400
+    let gatoradeRight = true
+    let playerLevel = 1
+    let cSpeed = -30
+    let cCollision = 0
+    let timeLeft = 400
+    let normalTimeCountdown = true
+
+
+    function isTouchingNearest(obj1, obj2){
+        try {
+            for (let subobj2 of get(obj2)){
+                if (Math.abs(get(obj1)[0].pos.x - subobj2.pos.x) == 20){
+                    return true
+                }
+            }
+            return false
+        }
+        catch {
+            // console.log("error")
+
+            return false
+        }
+
+    }
+    function isTouching(obj1, obj2){
+        try {
+            if (Math.abs(get(obj1)[0].pos.x - get(obj2)[0].pos.x) == 20){
+                return true
+            }
+            return false
+        }
+        catch {
+            return false
+        }
+
+
+    }
+    function bump(obj, pxl, sub=1){
+        let moveCount = sub
+        while (moveCount < pxl){
+            obj.move(0,-1)
+            moveCount++
+        }
+        while (moveCount != sub){
+            setTimeout(() => {obj.move(0,1)}, 0.01)
+            moveCount--
+        }
+    }
+    function randInt(min, max){
+        return Math.floor(Math.random() * (max-min) + min)
+    }
+
+
+    kaboom({
+        width: 600,
+        height: 300,
+        scale: 2,
+        debug: true,
+        background: [96, 148, 252],
+        canvas: document.querySelector("#mycanvas")
+    })
+    gravity(gravity() -5)
+    loadSprite("sharb", 'https://i.imgur.com/grofgfD.png', {
+        sliceX: 6,
+        sliceY: 2,
+        anims: {
+            idle: {
+                from: 5,
+                to: 5,
+            },
+            backIdle: {
+                from: 11,
+                to: 11,
+            },
+            run: {
+                from:0,
+                to: 2,
+                loop: true,
+            },
+            backRun: {
+                from: 6,
+                to: 8,
+                loop: true,
+            },
+            jump: {
+                from: 4,
+                to: 4
+            },
+            backJump: {
+                from: 10,
+                to: 10
+            },
+            latch: {
+                from: 2,
+                to: 2
+            }
+        }
+    })
+    loadSprite("endSharb", 'https://i.imgur.com/wlsbvIw.png', {
+        sliceX: 3,
+        anims: {
+            disco: {
+                from: 1,
+                to: 2,
+                loop:true
+            },
+            facepalm: {
+                from: 0,
+                to: 1,
+                loop:true
+            }
+        }
+    })
+    loadSprite("goomba", "https://i.imgur.com/s3MMyN3.png", {
+        sliceX: 2,
+        anims: {
+            move: {
+                from: 0,
+                to: 1,
+                loop: true,
+            }
+        }
+    })
+    loadSprite("cherry", "https://i.imgur.com/G7qemP5.png", {
+        sliceX: 2,
+        anims: {
+            up: {
+                from: 0,
+                to: 1,
+            },
+            down: {
+                from: 1,
+                to: 1,
+            }
+        }
+    })
+
+    let sprites =  [['block', 'https://i.imgur.com/yZX7EWr.png'], ['blue-block', 'https://i.imgur.com/D8r58Tv.png'], ['blue-brick', 'https://i.imgur.com/MfVZYnv.png'], ['blue-steel', 'https://i.imgur.com/dkstZjR.png'], ['blue-surprise', 'https://i.imgur.com/hXbYWFL.png'], ['brick', 'https://i.imgur.com/wDMvMKe.png'], ['question', 'https://i.imgur.com/l6wvgyM.png'], ['unboxed', 'https://i.imgur.com/UYyYBur.png'], ['coin', 'https://i.imgur.com/TYtae0c.png'], ['gatorade', 'https://i.imgur.com/3tGZcnN.png'], ['pipe-left', 'https://i.imgur.com/hatm18F.png'], ['pipe-right', 'https://i.imgur.com/YlhgzMB.png'], ['pipe-top-left-side', 'https://i.imgur.com/HTS5Mcf.png'], ['pipe-top-right-side', 'https://i.imgur.com/u3Ckzrr.png'], ['stair', 'https://i.imgur.com/B7OO3Jz.png'], ['pole', 'https://i.imgur.com/jLnumxD.png'], ["invis", "https://i.imgur.com/aLBc9He.png"], ['flag', 'https://i.imgur.com/Z4tt6g9.png']]
+
+    for (let sprite of sprites){
+        loadSprite(sprite[0], sprite[1])
+    }
+
+    scene("game", ({level, score}) => {
+        layers(['bg', 'obj', 'ui'], 'obj')
+        const player = add([
+            sprite("sharb", {
+                animSpeed: 1,
+                frame: 5
+            }),
+            area(),
+            pos(40,0),
+            body(),
+            solid(),
+            scale(playerScale),
+        ])
+        let goombas = "abcdefghhijklm"
+        let goombaMoveOnce = "0".repeat(goombas.length).split("")
+        let goombaLeft = []
+        let goombaIndex
+        for (let goom of goombas){goombaLeft.push(true)}
+
+
+        const levelConfig = {
+            width: 20, //20 pixels for the width of one character in the map constant
+            height: 20,
+            'x': () => [sprite('block'), area({width: 20, height: 20}), solid(), "destroy-block"],
+            '=': () => [sprite('brick'), area(), solid()], //Replace = with the block
+            '$': () => [sprite('coin'), "coin"],
+            '%': () => [sprite('question'), 'coin-surprise', area(), solid()], //the coin-surprise parameter gives it an id
+            '*': () => [sprite('question'), 'mushroom-surprise', area(), solid()],
+            '}': () => [sprite('unboxed'), area(), solid()],
+            '(': () => [sprite('pipe-left'), scale(0.5), area(), solid(), "pipe"],
+            ')': () => [sprite('pipe-right'), scale(0.5), area(), solid(), "pipe"],
+            '-': () => [sprite('pipe-top-left-side'), scale(0.5), area(), solid(), "pipe"],
+            '+': () => [sprite('pipe-top-right-side'), scale(0.5), area(), solid()],
+            '&': () => [sprite('cherry', {animSpeed: 1, frame:0}), area(), solid(), "dangerousC", body()],
+            '#': () => [sprite('gatorade'), "mushroom", area(),body()],
+            '/': () => [sprite('pipe-top-left-side'), scale(0.5), area(), solid()],
+            '\\': () => [sprite('pipe-top-right-side'), scale(0.5), area(), solid()],
+            '~': () => [sprite('invis'), area(), solid()],
+            '@': () => [sprite('stair'), area(), solid(), "stair"],
+            'Z': () => [sprite('pole'), area(), solid(), "pole"],
+            'F': () => [sprite('flag'), 'flag']
+
+        }
+
+        for (let goomba of goombas){
+            levelConfig[goomba] = () => [sprite('goomba', {animSpeed: 1}), area(), solid(), goomba, body()]
+        }
+        const map = ['                                                                                                                                                                                                                                ', '                                                                                                                                                                                                                                ', '                                                                                                                                                                                                                                ', '                                                                                                                                                                                                    FZ                          ', '                                                                                                                                                                                                     Z                          ', '                                                                                e f                                                                                                                  Z                          ', '                      %                                                         xxxxxxxx   xxx%              *          xxxx    x%%x                                                       @@        Z                          ', '                                                                                                                                                                                          @@@        Z                          ', '                                                                                                                                                                                         @@@@        Z                          ', '                                                                ~                                                                                                                       @@@@@        Z                          ', '                %   x*x%x                     -+         /\\                  x*x              x     xx    %  %  %     x          xx      @  @         @@  @            xx%x            @@@@@@        Z                          ', '                                      -+      ()         ()                                                                             @@  @@       @@@  @@                          @@@@@@@        Z                          ', '                            -+        ()      ()         ()                                                                            @@@  @@@     @@@@  @@@     -+              -+ @@@@@@@@        Z                          ', '                      a     ()        ()b     ()   c d   ()                                      g h       &                ii  jk    @@@@  @@@@   @@@@@  @@@@    ()         l m  ()@@@@@@@@@       @@                          ', '=====================================================================  ===============   ===============================================================  ======================================================================', '=====================================================================  ===============   ===============================================================  ======================================================================']
+        const gameLevel = addLevel(map, levelConfig)
+
+        let greatestPos = player.pos
+        player.onUpdate(() => {
+            if ((player.pos.x > greatestPos.x)){
+                greatestPos = player.pos
+            }
+            camPos(greatestPos)
+
+        })
+        const scoreLabel = add([
+            text("SCORE\n  " + score),
+            pos(width()/5, 10),
+            layer('ui'),
+            fixed(),
+            scale(0.25),
+            {
+                value: score
+            }
+        ])
+        const coinLabel = add([
+            text("COINS\n  " + score),
+            pos(width()*2/5, 10),
+            layer('ui'),
+            fixed(),
+            scale(0.25),
+            {
+                value: score
+            }
+        ])
+        const timeLabel = add([
+            text("TIME"),
+            pos(width()*3/5, 10),
+            layer('ui'),
+            fixed(),
+            scale(0.25),
+        ])
+        const timeLeftLabel = add([
+            text(" " + timeLeft),
+            pos(width()*3/5, 30),
+            layer('ui'),
+            fixed(),
+            scale(0.25),
+            {
+                value: timeLeft
+            }
+        ])
+        let timeInRange = true
+        onUpdate(() => {
+            timeInRange = timeLeftLabel.value > 0
+            if (normalTimeCountdown && timeInRange){
+                timeLeftLabel.value = 400 - Math.floor(time() * 2)
+                timeLeftLabel.text = " " + timeLeftLabel.value
+            }
+            else if (!normalTimeCountdown && timeInRange){
+                timeLeftLabel.value = 400 - Math.floor(time() * 50)
+                timeLeftLabel.text = " " + timeLeftLabel.value
+            }
+            else if (timeLeftLabel.value < 0){
+                timeLeftLabel.value = 0
+                timeLeftLabel.text = " 0"
+
+            }
+            else if (timeLeftLabel.value == 0){
+                scoreLabel.value += 50 * Math.floor((200)-(Math.floor(time())))
+                scoreLabel.text = "SCORE\n  " + scoreLabel.value
+                go("end", {win: true, score: scoreLabel.value, time: Math.floor(time())})
+            }
+
+
+        })
+
+        onUpdate(() => {
+            if (!player.grounded()){
+                if (lastRight > lastLeft){
+                    player.play("jump")
+                    if (!spacePressed){
+                        setTimeout(() => {
+                            playOnceR = true
+                        },1)
+                    }
+
+                }
+                else if (lastLeft > lastRight){
+                    player.play("backJump")
+                    if (!spacePressed){
+                        setTimeout(() => {
+                            playOnceL = true
+                        },1)
+                    }
+                }
+            }
+
+            else if ((lastRight > lastLeft) && rightDown){
+                if (playOnceR){
+                    player.play("run")
+                    playOnceR = false
+                }
+
+            }
+            else if ((lastLeft > lastRight) && leftDown){
+                if (playOnceL){
+                    player.play("backRun")
+                    playOnceL = false
+                }
+
+            }
+            else if (!leftDown && !rightDown) {
+                if (lastRight > lastLeft){
+                    player.play("idle")
+                }
+                else {
+                    player.play("backIdle")
+                }
+            }
+            else {
+                player.play("idle")
+            }
+        })
+        onKeyDown("shift", () => {
+            playerSpeed = 180
+
+        })
+        onKeyRelease("shift", () => {
+            playerSpeed = 140
+        })
+        onKeyPress('space', () => {
+            if (player.grounded() || isTouchingNearest("sharb", "a")){
+                spacePressed = true
+                player.jump(jumpForce)
+            }
+        })
+        onKeyRelease("space", () => {
+            playOnceR = true
+            playOnceL = true
+            spacePressed = false
+        })
+        keyPress('d', () => {
+            lastRight = Date.now()
+
+        })
+        keyDown('d', () => {
+            rightDown = true
+            if (lastRight > lastLeft){
+                player.move(playerSpeed,0)
+            }
+        })
+        keyRelease('d', () => {
+            rightDown = false
+            playOnceR = true
+            playOnceL = true
+
+        })
+        keyPress('a', () => {
+            lastLeft = Date.now()
+
+        })
+        keyDown('a', () => {
+            leftDown = true
+            if (lastRight < lastLeft){
+                player.move(-playerSpeed,0)
+            }
+        })
+        keyRelease('a', () => {
+            leftDown = false
+            playOnceR = true
+            playOnceL = true
+        })
+
+        onUpdate("mushroom", (m) => {
+            isTouchingNearest("mushroom", "pipe") ? gatoradeRight = !gatoradeRight : null
+            if (gatoradeRight){
+                m.move(mobSpeed, 0)
+            }
+            else {
+                m.move(-mobSpeed,0)
+            }
+        })
+
+
+        for (let goomba of goombas){
+            onUpdate(goomba, (mob) => {
+                goombaIndex = goombas.indexOf(goomba)
+                playerPos = player.pos.x
+                if ((mob.pos.x > (playerPos - mobDetectRange)) && ((playerPos + mobDetectRange) > mob.pos.x)){
+                    isTouchingNearest(goomba, "pipe") ? goombaLeft[goombaIndex] = !goombaLeft[goombaIndex] : null
+                    isTouching("c", "d") ? goombaLeft[2] = !goombaLeft[2] : null
+                    isTouching("d", "c") ? goombaLeft[3] = !goombaLeft[3] : null
+                    goombaLeft[goombaIndex] ? mob.move(-mobSpeed,0) : mob.move(mobSpeed,0)
+                    if (goombaMoveOnce[goombaIndex] == '0'){mob.play('move');goombaMoveOnce[goombaIndex] = 1}
+                }
+                else if (mob.pos.x < (playerPos - mobDetectRange)){mob.destroy()}
+            })
+            player.collides(goomba, (mob) => {
+                if (!player.grounded()){
+                    mob.destroy()
+                    scoreLabel.value += 100
+                    scoreLabel.text = "SCORE\n" + scoreLabel.value
+                }
+                else {
+                    --playerLevel
+                    if (playerLevel == 0){
+                        go("end", {win: false, score: scoreLabel.value, time: Math.floor(time())})
+                    }
+                    else{
+                        player.scale = vec2(0.2)
+
+                    }
+
+                }
+            })
+        }
+
+        onUpdate("dangerousC", (c) => {
+            playerPos = player.pos.x
+            if ((c.pos.x > (playerPos - mobDetectRange)) && ((playerPos + mobDetectRange) > c.pos.x)){
+                c.move(cSpeed,0)
+            }
+            for (let goomba of goombas){
+                if (isTouching("dangerousC", goomba)){
+                    destroy(get(goomba)[0])
+                    scoreLabel.value += 100
+                    scoreLabel.text = "SCORE\n" + scoreLabel.value
+                }
+
+            }
+            if (isTouchingNearest("dangerousC", "stair")){
+                cSpeed = -300
+            }
+        })
+        player.collides("dangerousC", (c) => {
+            cCollision += 1
+            switch (cCollision%2){
+                case 1:
+                    if (!player.grounded()){
+                        cSpeed = 0
+                        c.play("down")
+                    }
+                    else {
+                        --playerLevel
+                        if (playerLevel == 0){
+                            go("end", {win: false, score: scoreLabel.value, time: Math.floor(time())})
+                        }
+                        else{
+                            player.scale = vec2(0.2)
+
+                        }
+                    }
+                case 2:
+                    cSpeed = 300
+
+            }
+        })
+
+        player.on("headbutt", (obj) => {
+            if (obj.is("coin-surprise")) {
+                let mob = gameLevel.spawn("$", obj.gridPos.sub(0, 1))
+                destroy(obj)
+                gameLevel.spawn("}", obj.gridPos.sub(0,0))
+                bump(mob, 200)
+                scoreLabel.value += 200
+                scoreLabel.text = "SCORE\n" + scoreLabel.value
+                coinLabel.value += 1
+                coinLabel.text = "COINS\n" + coinLabel.value
+                setTimeout(()=> {mob.destroy()}, 100)
+            }
+            else if (obj.is("mushroom-surprise")){
+                let gatorade = gameLevel.spawn("#", obj.gridPos.sub(0,1))
+                destroy(obj)
+                gameLevel.spawn("}", obj.gridPos.sub(0,0))
+                bump(gatorade, 100)
+
+            }
+        })
+
+        player.collides("mushroom", (m) => {
+            m.destroy()
+
+            scoreLabel.value += 1000
+            scoreLabel.text = `Score\n${scoreLabel.value}`
+
+            ++playerLevel
+
+            if (playerLevel == 2){
+                player.scale = vec2(0.3)
+            }
+        })
+        player.collides("pole", (p) => {
+            normalTimeCountdown = false
+
+        })})
+
+    let positiveMessages = ["You are too good", "Thanks for wasting your time", "Expertly done", "Well done", "You are nuts!!!", "#1 Vitory Royale", "Give yourself a pat on the back"]
+    let negativeMessages = ["You suck", "You failed", "Noob", "How did you die to that", "Thank you for giving me \nanother page view", "You tried your best"]
+    scene('end', ({win, score, time}) => {
+        if (win){
+            add([text(positiveMessages[randInt(0,6)], {size: 25}), origin('center'), pos(width()/2, height()/5)])
+            add([text(`You scored ${score} points in ${time} seconds!`, {size: 20}), origin('center'), pos(width()/2, height()*2/5)])
+            add([text("Ctrl+r or refresh the page to play again", {size: 10}), origin('center'), pos(width()/2, height()*85/100)])
+            add([text("(I could have made it restart by itself but reloading gives me more page views)", {size: 8}), origin('center'), pos(width()/2, height()*88/100)])
+            add([text("Please tell me I did a good job by sliding into my Discord dms at Tiger Online#1658", {size: 10}), origin('center'), pos(width()/2, height()*95/100)])
+
+            const player = add([
+                sprite("endSharb", {
+                    animSpeed: 0.5,
+                    frame: 0
+                }),
+                area(),
+                pos(width()*45/100,height() * 7/15),
+                scale(0.5),
+            ])
+            const player2 = add([
+                sprite("endSharb", {
+                    animSpeed: 0.5,
+                    frame: 0
+                }),
+                area(),
+                pos(width()*20/100,height() * 7/15),
+                scale(0.5),
+            ])
+            const player3 = add([
+                sprite("endSharb", {
+                    animSpeed: 0.5,
+                    frame: 0
+                }),
+                area(),
+                pos(width()*70/100,height() * 7/15),
+                scale(0.5),
+            ])
+            player.play("disco")
+            player2.play("disco")
+            player3.play("disco")
+        }
+        else {
+            add([text(negativeMessages[randInt(0,6)], {size: 25}), origin('center'), pos(width()/2, height()/5)])
+            add([text(`Wow! You somehow managed to get ${score} points\nTook you ${time} seconds to die`, {size: 20}), origin('center'), pos(width()/2, height()*2/5)])
+            add([text("Ctrl+r or refresh the page to play again", {size: 10}), origin('center'), pos(width()/2, height()*85/100)])
+            add([text("(I could have made it restart by itself but reloading gives me more page views)", {size: 8}), origin('center'), pos(width()/2, height()*88/100)])
+            add([text("Please tell me I did a good job by sliding into my Discord dms at Tiger Online#1658", {size: 10}), origin('center'), pos(width()/2, height()*95/100)])
+
+            const player = add([
+                sprite("endSharb", {
+                    animSpeed: 0.5,
+                    frame: 0
+                }),
+                area(),
+                pos(width()*45/100,height() * 7/15),
+                scale(0.5),
+            ])
+            const player2 = add([
+                sprite("endSharb", {
+                    animSpeed: 0.5,
+                    frame: 0
+                }),
+                area(),
+                pos(width()*20/100,height() * 7/15),
+                scale(0.5),
+            ])
+            const player3 = add([
+                sprite("endSharb", {
+                    animSpeed: 0.5,
+                    frame: 0
+                }),
+                area(),
+                pos(width()*70/100,height() * 7/15),
+                scale(0.5),
+            ])
+            player.play("facepalm")
+            player2.play("facepalm")
+            player3.play("facepalm")
+        }
+
+    })
+
+    go("game", { level: 0, score: 0})
+</script>
+<canvas id="mycanvas"></canvas>
+
+<div id="controls">
+    <p id="controlText">
+        <kbd>d</kbd> Right&nbsp;&nbsp;&nbsp;&nbsp;<kbd>a</kbd> Left &nbsp;&nbsp;&nbsp;&nbsp;<kbd>space</kbd> Jump
+    </p>
+
+
+
+</div>
+</body>
+</html>
